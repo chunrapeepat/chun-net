@@ -9,7 +9,56 @@
 
 #define PORT 8888
 #define PROTOCOL 0
+#define BUFFER_SIZE 1024
 #define MAX_REQUEST_AT_TIME 10
+
+struct client {
+    int index;
+    int socketId;
+    int addrLen;
+    struct sockaddr_in clientAddr;
+};
+
+int isExit = 0;
+int clientCount = 0;
+
+struct client clients[BUFFER_SIZE];
+std::thread threads[BUFFER_SIZE];
+std::thread thShutdown;
+
+void doHandleShutdown() {
+    while (!isExit);
+    for (int i = 0; i < clientCount; ++i) {
+        threads[i].join();
+    }
+    thShutdown.join();
+    std::cout << "[Log] Server is shutting down..." << std::endl;
+    exit(-1);
+}
+
+void doReceiveCommand(int index) {
+    struct client* Client = &clients[index];
+    int clientSocket = Client->socketId;
+
+    std::cout << "[Log] New connection from client id = " << index+1 << std::endl;
+
+    while (true) {
+        char buffer[BUFFER_SIZE] = {0};
+        int read = recv(clientSocket, buffer, BUFFER_SIZE, 0);
+        buffer[read] = '\0';
+
+        if (strcmp(buffer, "SEND") == 0) {
+            // receive a message and broadcast to others
+            read = recv(clientSocket, buffer, BUFFER_SIZE, 0);
+            buffer[read] = '\0';
+
+            for (int i = 0; i < clientCount; ++i) {
+                if (i != index)
+                    send(clients[i].socketId, buffer, BUFFER_SIZE, 0);
+            }
+        }
+    }
+}
 
 int main() {
     std::cout << "[Log] The ChunNet server is running on port " << PORT << std::endl;
@@ -41,19 +90,19 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    int new_socket;
-    while (1) {
-        if ((new_socket = accept(sockfd, (struct sockaddr*) &address, (socklen_t*) &addrlen)) < 0) {
+    thShutdown = std::thread(doHandleShutdown);
+
+    while (true) {
+        clients[clientCount].socketId = accept(sockfd, (struct sockaddr*) &clients[clientCount].clientAddr, (socklen_t*) &clients[clientCount].addrLen);
+        clients[clientCount].index = clientCount;
+
+        if (clients[clientCount].socketId < 0) {
             std::cerr << "[Error] Error accepting request from client" << std::endl;
             exit(EXIT_FAILURE);
         }
-        char buffer[1024] = {0};
-        char *hello = "Hello from server";
 
-        recv(new_socket, buffer, 1024, 0);
-        printf("%s\n", buffer);
-        send(new_socket, hello, strlen(hello), 0);
-        printf("Hello message sent\n");
+        threads[clientCount] = std::thread(doReceiveCommand, clientCount);
+        ++clientCount;
     }
 
     return 0;
