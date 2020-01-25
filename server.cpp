@@ -16,6 +16,8 @@ struct client {
     int index;
     int socketId;
     int addrLen;
+    bool isOnline;
+    std::string username;
     struct sockaddr_in clientAddr;
 };
 
@@ -40,12 +42,51 @@ void doReceiveCommand(int index) {
     struct client* Client = &clients[index];
     int clientSocket = Client->socketId;
 
-    std::cout << "[Log] New connection from client id = " << index+1 << std::endl;
+    std::cout << "[Log] New connection from client; id = " << index+1 << std::endl;
 
     while (true) {
         char buffer[BUFFER_SIZE] = {0};
         int read = recv(clientSocket, buffer, BUFFER_SIZE, 0);
         buffer[read] = '\0';
+
+        if (strcmp(buffer, "JOIN") == 0) {
+            // store username and broadcast message
+            read = recv(clientSocket, buffer, BUFFER_SIZE, 0);
+            buffer[read] = '\0';
+
+            clients[index].username = std::string(buffer);
+            clients[index].isOnline = true;
+
+            std::string message = std::string(buffer);
+            message += " has joined the chat";
+
+            for (int i = 0; i < clientCount; ++i) {
+                if (clients[i].isOnline) {
+                    send(clients[i].socketId, message.c_str(), BUFFER_SIZE, 0);
+                }
+            }
+
+            std::cout << "[Log] " << message << std::endl;
+        }
+
+        if (strcmp(buffer, "LEAVE") == 0) {
+            clients[index].isOnline = false;
+
+            std::string message = clients[index].username;
+            message += " has leaved the chat";
+            send(clients[index].socketId, message.c_str(), BUFFER_SIZE, 0);
+
+            close(clients[index].socketId);
+            std::cout << "[Log] " << message << std::endl;
+        }
+
+        if (strcmp(buffer, "LIST") == 0) {
+            std::vector<string> onlines;
+            for (int i = 0; i < clientCount; ++i) {
+                if (clients[i].isOnline)
+                    onlines.push_back(clients[i].username);
+            }
+        }
 
         if (strcmp(buffer, "SEND") == 0) {
             // receive a message and broadcast to others
@@ -53,9 +94,9 @@ void doReceiveCommand(int index) {
             buffer[read] = '\0';
 
             for (int i = 0; i < clientCount; ++i) {
-                std::cout << "Debug: " << clients[i].socketId << std::endl;
-                if (index != i)
+                if (index != i && clients[i].isOnline) {
                     send(clients[i].socketId, buffer, BUFFER_SIZE, 0);
+                }
             }
         }
     }
@@ -71,11 +112,11 @@ int main() {
     }
     const int opt = 1;
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
-        std::cerr << "[Error] setsockopt" << std::endl;
+        std::cerr << "[Error] setsockopt reuseaddr" << std::endl;
         exit(EXIT_FAILURE);
     }
     if (setsockopt(sockfd, SOL_SOCKET, SO_NOSIGPIPE, &opt, sizeof(opt))) {
-        std::cerr << "[Error] setsockopt" << std::endl;
+        std::cerr << "[Error] setsockopt nosigpipe" << std::endl;
         exit(EXIT_FAILURE);
     }
 

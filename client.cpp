@@ -102,7 +102,7 @@ int main() {
         } else if (tokens[0].compare("exit") == 0) {
             send(clientSocket, "LEAVE", BUFFER_SIZE, 0);
             std::cout << "[ChunNet] Exiting program..., Good Bye :)" << std::endl;
-            break;
+            exit(0);
         } else {
             std::cout << "[ChunNet] Unknown command " << tokens[0] << std::endl;
         }
