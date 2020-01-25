@@ -25,16 +25,18 @@ int main(int argc, char const *argv[]) {
         printf("\nInvalid address/ Address not supported \n");
         return -1;
     }
-
     if (connect(sock, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) < 0) {
         printf("\nConnection Failed \n");
         return -1;
     }
 
-    send(sock , hello , strlen(hello), 0);
+    send(sock , hello, strlen(hello), 0);
     printf("Hello message sent\n");
-    valread = read(sock, buffer, 1024);
-    printf("%s\n",buffer);
+
+    while (1) {
+        recv(sock, buffer, 1024, 0);
+        printf("%s\n", buffer);
+    }
 
     return 0;
 }

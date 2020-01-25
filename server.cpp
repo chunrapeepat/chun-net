@@ -1,4 +1,6 @@
 #include <iostream>
+#include <vector>
+#include <thread>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <stdlib.h>
@@ -7,24 +9,19 @@
 
 #define PORT 8888
 #define PROTOCOL 0
+#define MAX_REQUEST_AT_TIME 10
 
 int main() {
-    std::cout << "[Log] The server is running on port " << 8888 << std::endl;
+    std::cout << "[Log] The ChunNet server is running on port " << PORT << std::endl;
 
-    int sockfd, new_socket, valread;
-    int opt = 1;
-    char buffer[1024] = {0};
-    char *hello = "Hello from server";
-
-    // Creating socket file descriptor
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, PROTOCOL)) == 0) {
-        perror("socket failed");
+    const int sockfd = socket(AF_INET, SOCK_STREAM, PROTOCOL);
+    if (sockfd == 0) {
+        std::cerr << "[Error] Socket failed" << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    // Forcefully attaching socket to the port
+    const int opt = 1;
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
-        perror("setsockopt");
+        std::cerr << "[Error] setsockopt" << std::endl;
         exit(EXIT_FAILURE);
     }
 
@@ -35,23 +32,29 @@ int main() {
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
 
-    // Forcefully attaching socket to the port 8888
     if (bind(sockfd, (struct sockaddr*) &address, sizeof(address))) {
-        perror("bind failed");
+        std::cerr << "[Error] Error binding socket" << std::endl;
         exit(EXIT_FAILURE);
     }
-    if (listen(sockfd, 3) < 0) {
-        perror("listen");
+    if (listen(sockfd, MAX_REQUEST_AT_TIME) < 0) {
+        std::cerr << "[Error] Error listening" << std::endl;
         exit(EXIT_FAILURE);
     }
-    if ((new_socket = accept(sockfd, (struct sockaddr*) &address, (socklen_t*) &addrlen)) < 0) {
-        perror("accept");
-        exit(EXIT_FAILURE);
+
+    int new_socket;
+    while (1) {
+        if ((new_socket = accept(sockfd, (struct sockaddr*) &address, (socklen_t*) &addrlen)) < 0) {
+            std::cerr << "[Error] Error accepting request from client" << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        char buffer[1024] = {0};
+        char *hello = "Hello from server";
+
+        recv(new_socket, buffer, 1024, 0);
+        printf("%s\n", buffer);
+        send(new_socket, hello, strlen(hello), 0);
+        printf("Hello message sent\n");
     }
-    valread = read(new_socket, buffer, 1024);
-    printf("%s\n",buffer);
-    send(new_socket, hello, strlen(hello), 0);
-    printf("Hello message sent\n");
 
     return 0;
 }
