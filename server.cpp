@@ -11,6 +11,7 @@
 #define PORT 8888
 #define PROTOCOL 0
 #define BUFFER_SIZE 1024
+#define PAYLOAD_OFFSET 1
 #define MAX_REQUEST_AT_TIME 10
 
 struct client {
@@ -56,11 +57,22 @@ std::string join(const std::vector<std::string>& vec, const char* delim) {
 }
 
 std::string buildPayload(const std::vector<std::string>& req) {
-    std::string payload = trim(req[1]);
-    for (int i = 2; i < req.size(); ++i) {
+    std::string payload = trim(req[PAYLOAD_OFFSET]);
+    for (int i = PAYLOAD_OFFSET + 1; i < req.size(); ++i) {
         payload += ' ' + trim(req[i]);
     }
     return trim(payload);
+}
+
+// format: <type> <status> [payload]
+// type: JOIN, LEAVE, LIST, SHUTDOWN, SEND, CHAT
+// status: ERR, OK
+void sendResponse(int socketId, std::string type, std::string status, std::string payload) {
+    std::string object = type + ' ' + status;
+    if (payload.size() > 0) {
+        object += ' ' + trim(payload);
+    }
+    send(socketId, object.c_str(), BUFFER_SIZE, 0);
 }
 
 void doReceiveCommand(int index) {
@@ -77,16 +89,18 @@ void doReceiveCommand(int index) {
         std::vector<std::string> tokens = split(std::string(buffer), ' ');
         if (tokens.size() == 0) continue;
 
+        std::cout << "[Log] PROTOCOL; " << buffer << std::endl;
+
         if (tokens[0].compare("JOIN") == 0) {
             // store username and broadcast message
             if (tokens.size() < 2) {
-                // response error
+                sendResponse(clientSocket, "JOIN", "ERR", "Username must be exist");
                 continue;
             }
 
             std::string username = buildPayload(tokens);
-            if (username.size() == 0) {
-                // response error
+            if (trim(username).size() == 0) {
+                sendResponse(clientSocket, "JOIN", "ERR", "Username can't be empty");
                 continue;
             }
 
@@ -103,6 +117,7 @@ void doReceiveCommand(int index) {
             }
 
             std::cout << "[Log] " << message << std::endl;
+            sendResponse(clientSocket, "JOIN", "OK", "");
         }
 
         if (tokens[0].compare("LEAVE") == 0) {
@@ -118,8 +133,9 @@ void doReceiveCommand(int index) {
                 }
             }
 
-            close(clients[index].socketId);
             std::cout << "[Log] " << message << std::endl;
+            sendResponse(clientSocket, "LEAVE", "OK", "");
+            close(clientSocket);
         }
 
         if (tokens[0].compare("LIST") == 0) {
@@ -130,19 +146,20 @@ void doReceiveCommand(int index) {
             }
             std::string message = "Online ";
             message += "(" + std::to_string(onlines.size()) + "): " + join(onlines, ", ");
-            send(clients[index].socketId, message.c_str(), BUFFER_SIZE, 0);
+
+            sendResponse(clientSocket, "LIST", "OK", message.c_str());
         }
 
         if (tokens[0].compare("SEND") == 0) {
             // receive a message and broadcast to others
             if (tokens.size() < 2) {
-                // response error
+                sendResponse(clientSocket, "SEND", "ERR", "Message must be exist");
                 continue;
             }
 
             std::string message = buildPayload(tokens);
-            if (message.size() == 0) {
-                // response error
+            if (trim(message).size() == 0) {
+                sendResponse(clientSocket, "SEND", "ERR", "Message can't be empty");
                 continue;
             }
 
@@ -150,17 +167,21 @@ void doReceiveCommand(int index) {
 
             for (int i = 0; i < clientCount; ++i) {
                 if (index != i && clients[i].isOnline) {
-                    send(clients[i].socketId, message.c_str(), BUFFER_SIZE, 0);
+                    sendResponse(clients[i].socketId, "CHAT", "OK", message.c_str());
                 }
             }
+
+            sendResponse(clientSocket, "SEND", "OK", "");
         }
 
         if (tokens[0].compare("SHUTDOWN") == 0) {
             std::cout << "[Log] Server is shutting down..." << std::endl;
             for (int i = 0; i < clientCount; ++i) {
-                send(clients[i].socketId, "Server is shutting down...", BUFFER_SIZE, 0);
+                sendResponse(clientSocket, "CHAT", "OK", "Server is shutting down...");
                 close(clients[i].socketId);
             }
+            sendResponse(clientSocket, "SHUTDOWN", "OK", "");
+            // TODO: handle thread, clean up resource
             exit(0);
         }
     }
