@@ -53,7 +53,9 @@ void doReceiveCommand(int index) {
             buffer[read] = '\0';
 
             for (int i = 0; i < clientCount; ++i) {
-                send(clients[i].socketId, buffer, BUFFER_SIZE, 0);
+                std::cout << "Debug: " << clients[i].socketId << std::endl;
+                if (index != i)
+                    send(clients[i].socketId, buffer, BUFFER_SIZE, 0);
             }
         }
     }
@@ -69,6 +71,10 @@ int main() {
     }
     const int opt = 1;
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
+        std::cerr << "[Error] setsockopt" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    if (setsockopt(sockfd, SOL_SOCKET, SO_NOSIGPIPE, &opt, sizeof(opt))) {
         std::cerr << "[Error] setsockopt" << std::endl;
         exit(EXIT_FAILURE);
     }
