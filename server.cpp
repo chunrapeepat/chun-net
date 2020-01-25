@@ -97,9 +97,11 @@ void doReceiveCommand(int index) {
             read = recv(clientSocket, buffer, BUFFER_SIZE, 0);
             buffer[read] = '\0';
 
+            std::string message = clients[index].username + ": " + std::string(buffer);
+
             for (int i = 0; i < clientCount; ++i) {
                 if (index != i && clients[i].isOnline) {
-                    send(clients[i].socketId, buffer, BUFFER_SIZE, 0);
+                    send(clients[i].socketId, message.c_str(), BUFFER_SIZE, 0);
                 }
             }
         }
