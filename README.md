@@ -1,6 +1,8 @@
 # chun-net
 ChunNet - A chat application is written in C++ using socket programming
 
+![Screenshot](screenshot.png)
+
 ## Setup
 1. Clone this repository and cd into it
 ```bash
