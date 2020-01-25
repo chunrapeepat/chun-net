@@ -20,6 +20,16 @@ std::vector<std::string> split(const std::string& s, char delimiter) {
     return tokens;
 }
 
+// format: <type> [payload]
+// type: JOIN <username>, LEAVE, SEND <message>, LIST, SHUTDOWN
+void sendRequest(int clientSocket, std::string type, std::string payload) {
+    std::string object = type;
+    if (payload.size() > 0) {
+        object += ' ' + payload;
+    }
+    send(clientSocket, object.c_str(), BUFFER_SIZE, 0);
+}
+
 void doReceive(int clientSocket) {
     while (true) {
         char buffer[BUFFER_SIZE] = {0};
@@ -36,9 +46,9 @@ void doReceive(int clientSocket) {
 }
 
 void displayWelcomeMessage() {
-    std::cout << "=============================================" << std::endl;
-    std::cout << "  Welcome to ChunNet - The Chat Application" << std::endl;
-    std::cout << "=============================================" << std::endl;
+    std::cout << "==================================================" << std::endl;
+    std::cout << "    Welcome to ChunNet - The Chat Application" << std::endl;
+    std::cout << "==================================================" << std::endl;
     std::cout << std::endl;
     std::cout << "[ChunNet] Commands:" << std::endl;
     std::cout << "[ChunNet]     · send <message> - Send a message" << std::endl;
@@ -52,8 +62,7 @@ void authenication(int clientSocket) {
     std::cout << "Enter your name: ";
     std::string username; getline(std::cin, username);
 
-    send(clientSocket, "JOIN", BUFFER_SIZE, 0);
-    send(clientSocket, username.c_str(), BUFFER_SIZE, 0);
+    sendRequest(clientSocket, "JOIN", username);
 }
 
 int main() {
@@ -91,6 +100,7 @@ int main() {
         if (tokens.size() == 0) continue;
 
         if (tokens[0].compare("send") == 0) {
+            // send a message to the chat
             if (tokens.size() < 2) {
                 std::cout << "[ChunNet] Usage: send <message>" << std::endl;
                 continue;
@@ -98,14 +108,16 @@ int main() {
             std::string message = "";
             for (int i = 1; i < tokens.size(); ++i) message += tokens[i] + ' ';
 
-            send(clientSocket, "SEND", BUFFER_SIZE, 0);
-            send(clientSocket, message.c_str(), BUFFER_SIZE, 0);
+            sendRequest(clientSocket, "SEND", message);
         } else if (tokens[0].compare("list") == 0) {
-            send(clientSocket, "LIST", BUFFER_SIZE, 0);
+            // display online users
+            sendRequest(clientSocket, "LIST", "");
         } else if (tokens[0].compare("shutdown") == 0) {
-            send(clientSocket, "SHUTDOWN", BUFFER_SIZE, 0);
+            // shutdown the server
+            sendRequest(clientSocket, "SHUTDOWN", "");
         } else if (tokens[0].compare("exit") == 0) {
-            send(clientSocket, "LEAVE", BUFFER_SIZE, 0);
+            // exit the program
+            sendRequest(clientSocket, "LEAVE", "");
             std::cout << "[ChunNet] Exiting program..., Good Bye :)" << std::endl;
             exit(0);
         } else {

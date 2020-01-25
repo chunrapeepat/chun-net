@@ -27,10 +27,40 @@ int clientCount = 0;
 struct client clients[BUFFER_SIZE];
 std::thread threads[BUFFER_SIZE];
 
+std::string trim(const std::string &s) {
+    std::string::const_iterator it = s.begin();
+    while (it != s.end() && isspace(*it))
+        it++;
+
+    std::string::const_reverse_iterator rit = s.rbegin();
+    while (rit.base() != it && isspace(*rit))
+        rit++;
+
+    return std::string(it, rit.base());
+}
+
+std::vector<std::string> split(const std::string& s, char delimiter) {
+    std::vector<std::string> tokens;
+    std::string token;
+    std::istringstream tokenStream(s);
+    while (std::getline(tokenStream, token, delimiter)) {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
+
 std::string join(const std::vector<std::string>& vec, const char* delim) {
     std::stringstream res;
     copy(vec.begin(), vec.end(), std::ostream_iterator<std::string>(res, delim));
     return res.str().substr(0, res.str().size() - 2);
+}
+
+std::string buildPayload(const std::vector<std::string>& req) {
+    std::string payload = trim(req[1]);
+    for (int i = 2; i < req.size(); ++i) {
+        payload += ' ' + trim(req[i]);
+    }
+    return trim(payload);
 }
 
 void doReceiveCommand(int index) {
@@ -44,15 +74,26 @@ void doReceiveCommand(int index) {
         int read = recv(clientSocket, buffer, BUFFER_SIZE, 0);
         buffer[read] = '\0';
 
-        if (strcmp(buffer, "JOIN") == 0) {
-            // store username and broadcast message
-            read = recv(clientSocket, buffer, BUFFER_SIZE, 0);
-            buffer[read] = '\0';
+        std::vector<std::string> tokens = split(std::string(buffer), ' ');
+        if (tokens.size() == 0) continue;
 
-            clients[index].username = std::string(buffer);
+        if (tokens[0].compare("JOIN") == 0) {
+            // store username and broadcast message
+            if (tokens.size() < 2) {
+                // response error
+                continue;
+            }
+
+            std::string username = buildPayload(tokens);
+            if (username.size() == 0) {
+                // response error
+                continue;
+            }
+
+            clients[index].username = username;
             clients[index].isOnline = true;
 
-            std::string message = std::string(buffer);
+            std::string message = username;
             message += " has joined the chat";
 
             for (int i = 0; i < clientCount; ++i) {
@@ -64,7 +105,7 @@ void doReceiveCommand(int index) {
             std::cout << "[Log] " << message << std::endl;
         }
 
-        if (strcmp(buffer, "LEAVE") == 0) {
+        if (tokens[0].compare("LEAVE") == 0) {
             clients[index].isOnline = false;
 
             std::string message = clients[index].username;
@@ -81,7 +122,7 @@ void doReceiveCommand(int index) {
             std::cout << "[Log] " << message << std::endl;
         }
 
-        if (strcmp(buffer, "LIST") == 0) {
+        if (tokens[0].compare("LIST") == 0) {
             std::vector<std::string> onlines;
             for (int i = 0; i < clientCount; ++i) {
                 if (clients[i].isOnline)
@@ -92,12 +133,20 @@ void doReceiveCommand(int index) {
             send(clients[index].socketId, message.c_str(), BUFFER_SIZE, 0);
         }
 
-        if (strcmp(buffer, "SEND") == 0) {
+        if (tokens[0].compare("SEND") == 0) {
             // receive a message and broadcast to others
-            read = recv(clientSocket, buffer, BUFFER_SIZE, 0);
-            buffer[read] = '\0';
+            if (tokens.size() < 2) {
+                // response error
+                continue;
+            }
 
-            std::string message = clients[index].username + ": " + std::string(buffer);
+            std::string message = buildPayload(tokens);
+            if (message.size() == 0) {
+                // response error
+                continue;
+            }
+
+            message = clients[index].username + ": " + message;
 
             for (int i = 0; i < clientCount; ++i) {
                 if (index != i && clients[i].isOnline) {
@@ -106,7 +155,7 @@ void doReceiveCommand(int index) {
             }
         }
 
-        if (strcmp(buffer, "SHUTDOWN") == 0) {
+        if (tokens[0].compare("SHUTDOWN") == 0) {
             std::cout << "[Log] Server is shutting down..." << std::endl;
             for (int i = 0; i < clientCount; ++i) {
                 send(clients[i].socketId, "Server is shutting down...", BUFFER_SIZE, 0);
@@ -136,8 +185,6 @@ int main() {
     }
 
     struct sockaddr_in address;
-    int addrlen = sizeof(address);
-
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
