@@ -180,8 +180,12 @@ void doReceiveCommand(int index) {
                 sendResponse(clientSocket, "CHAT", "OK", "Server is shutting down...");
                 close(clients[i].socketId);
             }
-            sendResponse(clientSocket, "SHUTDOWN", "OK", "");
-            // TODO: handle thread, clean up resource
+            for (auto client : clients) {
+                close(client.socketId);
+            }
+            for (int i = 0; i < clientCount; ++i) {
+                threads[i].detach();
+            }
             exit(0);
         }
     }

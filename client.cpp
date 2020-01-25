@@ -132,12 +132,6 @@ void doReceive(int clientSocket) {
                 std::cout << "[ChunNet] " << res.payload << std::endl;
             }
         }
-        if (res.type.compare("SHUTDOWN") == 0) {
-            if (res.OK) {
-                std::cout << "[ChunNet] Server has been shutdown" << std::endl;
-                exit(0);
-            }
-        }
         if (res.type.compare("SEND") == 0) {
             if (res.ERROR) {
                 std::cout << "[ChunNet] Error: " << res.payload << std::endl;
