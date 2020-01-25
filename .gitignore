@@ -1,5 +1,7 @@
 /.idea
 runable
+client
+server
 
 # Prerequisites
 *.d
