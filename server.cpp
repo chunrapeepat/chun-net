@@ -53,8 +53,7 @@ void doReceiveCommand(int index) {
             buffer[read] = '\0';
 
             for (int i = 0; i < clientCount; ++i) {
-                if (i != index)
-                    send(clients[i].socketId, buffer, BUFFER_SIZE, 0);
+                send(clients[i].socketId, buffer, BUFFER_SIZE, 0);
             }
         }
     }
