@@ -26,6 +26,11 @@ void doReceive(int clientSocket) {
         int read = recv(clientSocket, buffer, BUFFER_SIZE, 0);
         buffer[read] = '\0';
 
+        if (read == 0) {
+            std::cerr << "[Error] Connection failed" << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
         std::cout << "[>] " << buffer << std::endl;
     }
 }

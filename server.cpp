@@ -22,27 +22,15 @@ struct client {
     struct sockaddr_in clientAddr;
 };
 
-int isExit = 0;
 int clientCount = 0;
 
 struct client clients[BUFFER_SIZE];
 std::thread threads[BUFFER_SIZE];
-std::thread thShutdown;
 
 std::string join(const std::vector<std::string>& vec, const char* delim) {
     std::stringstream res;
     copy(vec.begin(), vec.end(), std::ostream_iterator<std::string>(res, delim));
     return res.str().substr(0, res.str().size() - 2);
-}
-
-void doHandleShutdown() {
-    while (!isExit);
-    for (int i = 0; i < clientCount; ++i) {
-        threads[i].join();
-    }
-    thShutdown.join();
-    std::cout << "[Log] Server is shutting down..." << std::endl;
-    exit(-1);
 }
 
 void doReceiveCommand(int index) {
@@ -115,6 +103,15 @@ void doReceiveCommand(int index) {
                 }
             }
         }
+
+        if (strcmp(buffer, "SHUTDOWN") == 0) {
+            std::cout << "[Log] Server is shutting down..." << std::endl;
+            for (int i = 0; i < clientCount; ++i) {
+                send(clients[i].socketId, "Server is shutting down...", BUFFER_SIZE, 0);
+                close(clients[i].socketId);
+            }
+            exit(0);
+        }
     }
 }
 
@@ -151,8 +148,6 @@ int main() {
         std::cerr << "[Error] Error listening" << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    thShutdown = std::thread(doHandleShutdown);
 
     while (true) {
         clients[clientCount].socketId = accept(sockfd, (struct sockaddr*) &clients[clientCount].clientAddr, (socklen_t*) &clients[clientCount].addrLen);
