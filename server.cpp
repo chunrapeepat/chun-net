@@ -12,9 +12,7 @@ int main() {
     std::cout << "[Log] The server is running on port " << 8888 << std::endl;
 
     int sockfd, new_socket, valread;
-    struct sockaddr_in address;
     int opt = 1;
-    int addrlen = sizeof(address);
     char buffer[1024] = {0};
     char *hello = "Hello from server";
 
@@ -29,11 +27,15 @@ int main() {
         perror("setsockopt");
         exit(EXIT_FAILURE);
     }
+
+    struct sockaddr_in address;
+    int addrlen = sizeof(address);
+
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
 
-    // Forcefully attaching socket to the port 8080
+    // Forcefully attaching socket to the port 8888
     if (bind(sockfd, (struct sockaddr*) &address, sizeof(address))) {
         perror("bind failed");
         exit(EXIT_FAILURE);
@@ -46,7 +48,7 @@ int main() {
         perror("accept");
         exit(EXIT_FAILURE);
     }
-    valread = read(new_socket , buffer, 1024);
+    valread = read(new_socket, buffer, 1024);
     printf("%s\n",buffer);
     send(new_socket, hello, strlen(hello), 0);
     printf("Hello message sent\n");
