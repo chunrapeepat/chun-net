@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <thread>
+#include <sstream>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <stdlib.h>
@@ -27,6 +28,12 @@ int clientCount = 0;
 struct client clients[BUFFER_SIZE];
 std::thread threads[BUFFER_SIZE];
 std::thread thShutdown;
+
+std::string join(const std::vector<std::string>& vec, const char* delim) {
+    std::stringstream res;
+    copy(vec.begin(), vec.end(), std::ostream_iterator<std::string>(res, delim));
+    return res.str().substr(0, res.str().size() - 2);
+}
 
 void doHandleShutdown() {
     while (!isExit);
@@ -76,16 +83,25 @@ void doReceiveCommand(int index) {
             message += " has leaved the chat";
             send(clients[index].socketId, message.c_str(), BUFFER_SIZE, 0);
 
+            for (int i = 0; i < clientCount; ++i) {
+                if (clients[i].isOnline) {
+                    send(clients[i].socketId, message.c_str(), BUFFER_SIZE, 0);
+                }
+            }
+
             close(clients[index].socketId);
             std::cout << "[Log] " << message << std::endl;
         }
 
         if (strcmp(buffer, "LIST") == 0) {
-            std::vector<string> onlines;
+            std::vector<std::string> onlines;
             for (int i = 0; i < clientCount; ++i) {
                 if (clients[i].isOnline)
                     onlines.push_back(clients[i].username);
             }
+            std::string message = "Online ";
+            message += "(" + std::to_string(onlines.size()) + "): " + join(onlines, ", ");
+            send(clients[index].socketId, message.c_str(), BUFFER_SIZE, 0);
         }
 
         if (strcmp(buffer, "SEND") == 0) {
