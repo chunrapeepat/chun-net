@@ -1,22 +1,54 @@
 #include <iostream>
 #include <thread>
+#include <vector>
+#include <string>
+#include <sstream>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <unistd.h>
-#include <string.h>
 
 #define PORT 8888
 #define PROTOCOL 0
 #define BUFFER_SIZE 1024
 
+std::vector<std::string> split(const std::string& s, char delimiter) {
+    std::vector<std::string> tokens;
+    std::string token;
+    std::istringstream tokenStream(s);
+    while (std::getline(tokenStream, token, delimiter)) {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
+
 void doReceive(int clientSocket) {
     while (true) {
-        char buffer[1024] = {0};
+        char buffer[BUFFER_SIZE] = {0};
         int read = recv(clientSocket, buffer, BUFFER_SIZE, 0);
         buffer[read] = '\0';
 
         std::cout << "[>] " << buffer << std::endl;
     }
+}
+
+void displayWelcomeMessage() {
+    std::cout << "=============================================" << std::endl;
+    std::cout << "  Welcome to ChunNet - The Chat Application" << std::endl;
+    std::cout << "=============================================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "[ChunNet] Commands:" << std::endl;
+    std::cout << "[ChunNet]     · send <message> - Send a message" << std::endl;
+    std::cout << "[ChunNet]     · list - View currently online person" << std::endl;
+    std::cout << "[ChunNet]     · shutdown - Shutdown the server" << std::endl;
+    std::cout << "[ChunNet]     · exit - Exit the program" << std::endl;
+    std::cout << std::endl;
+}
+
+void authenication(int clientSocket) {
+    std::cout << "Enter your name: ";
+    std::string username; getline(std::cin, username);
+
+    send(clientSocket, "JOIN", BUFFER_SIZE, 0);
+    send(clientSocket, username.c_str(), BUFFER_SIZE, 0);
 }
 
 int main() {
@@ -40,21 +72,39 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    std::cout << "[ChunNet] Connection established...." << std::endl;
     std::thread thReceive(doReceive, clientSocket);
+
+    std::cout << "[ChunNet] Connection has been established!" << std::endl;
+    displayWelcomeMessage();
+    authenication(clientSocket);
 
     // sending command
     while (1) {
-        char buffer[1024] = {0};
-        scanf("%s", buffer); getchar();
+        std::string command; getline(std::cin, command);
+        std::vector<std::string> tokens = split(command, ' ');
 
-        if (strcmp(buffer, "SEND") == 0) {
-            send(clientSocket, buffer, BUFFER_SIZE, 0);
+        if (tokens.size() == 0) continue;
 
-            std::string message; getline(std::cin, message);
+        if (tokens[0].compare("send") == 0) {
+            if (tokens.size() < 2) {
+                std::cout << "[ChunNet] Usage: send <message>" << std::endl;
+                continue;
+            }
+            std::string message = "";
+            for (int i = 1; i < tokens.size(); ++i) message += tokens[i] + ' ';
+
+            send(clientSocket, "SEND", BUFFER_SIZE, 0);
             send(clientSocket, message.c_str(), BUFFER_SIZE, 0);
+        } else if (tokens[0].compare("list") == 0) {
+            send(clientSocket, "LIST", BUFFER_SIZE, 0);
+        } else if (tokens[0].compare("shutdown") == 0) {
+            send(clientSocket, "SHUTDOWN", BUFFER_SIZE, 0);
+        } else if (tokens[0].compare("exit") == 0) {
+            send(clientSocket, "LEAVE", BUFFER_SIZE, 0);
+            std::cout << "[ChunNet] Exiting program..., Good Bye :)" << std::endl;
+            break;
         } else {
-            std::cout << "[ChunNet] Unknown command " << buffer << std::endl;
+            std::cout << "[ChunNet] Unknown command " << tokens[0] << std::endl;
         }
     }
 
